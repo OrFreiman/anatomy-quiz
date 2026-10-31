@@ -73,6 +73,8 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.25;margin:0;
 .qhead .count{font-weight:700;font-variant-numeric:tabular-nums}
 .dots{display:flex;gap:4px;flex:1}
 .dots i{flex:1;height:6px;border-radius:99px;background:var(--line)}
+.pbar{flex:1;height:6px;border-radius:99px;background:var(--line);overflow:hidden;display:flex}
+.pbar i{height:100%}.pbar i.ok{background:var(--good)}.pbar i.no{background:var(--bad)}
 .dots i.ok{background:var(--good)} .dots i.no{background:var(--bad)} .dots i.cur{background:var(--accent)}
 .xbtn{background:none;border:0;color:var(--muted);font-size:15px;padding:6px}
 .tag{display:inline-block;font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:2px 10px;border-radius:99px}
@@ -251,9 +253,10 @@ function start(mode,topic){
   let pool=QUESTIONS, label="תרגול חדש";
   if(mode==="mistakes"){pool=mistakes(); label="תרגול טעויות";}
   if(mode==="topic"){pool=QUESTIONS.filter(q=>q.t===topic); label=TOPICS[topic];}
-  const qs=mode==="mistakes"?shuffle(pool).slice(0,SESSION_LEN):pick(pool);
+  if(mode==="full"){pool=QUESTIONS.filter(q=>q.t===topic); label="כל השאלות · "+TOPICS[topic];}
+  const qs=mode==="mistakes"?shuffle(pool).slice(0,SESSION_LEN):mode==="full"?shuffle(pool):pick(pool);
   if(!qs.length){toast("אין שאלות לתרגול כאן");return}
-  sess={mode,label,qs:qs.map(q=>({id:q.id,order:shuffle([0,1,2,3]),chosen:null,ok:null,gain:0})),i:0,run:0,gained:0};
+  sess={mode,label,qs:qs.map(q=>({id:q.id,order:shuffle([0,1,2,3]),chosen:null,ok:null,gain:0})),i:0,run:0,gained:0,topic};
   view="quiz"; render(); window.scrollTo(0,0);
 }
 function answer(k){
@@ -290,11 +293,12 @@ function render(){
   else if(view==="quiz") el.innerHTML=quizView();
   else if(view==="result") el.innerHTML=resultView();
   else if(view==="dash") el.innerHTML=dashView();
+  else if(view==="tpick") el.innerHTML=tpickView();
   else if(view==="bank"){ el.innerHTML=bankView(); paintBank(); }
 }
 function topicRows(){
   return TOPIC_ORDER.map(t=>{const s=topicStats(t);const m=Math.round(s.mastery*100);
-    return `<button class="topic" type="button" data-act="topic" data-t="${t}" aria-label="תרגול ${esc(TOPICS[t])}">
+    return `<button class="topic" type="button" data-act="tpick" data-t="${t}" aria-label="תרגול ${esc(TOPICS[t])}">
       <span class="nm">${esc(TOPICS[t])} <small>· ${s.seen}/${s.n} נענו</small></span><span class="pc">${m}%</span>
       <span class="bar"><i class="m" style="width:${s.know/s.n*100}%"></i><i class="s" style="width:${(s.seen-s.know)/s.n*100}%"></i></span></button>`}).join("");
 }
@@ -321,7 +325,7 @@ function homeView(){
     <div class="kpi"><b>${dayStreak()}</b><span>ימים ברצף</span></div>
   </div>
   <section class="card">
-    <div class="sect"><h2>שליטה לפי נושא</h2><span class="muted" style="font-size:13px">הקשה על נושא = תרגול שלו</span></div>
+    <div class="sect"><h2>שליטה לפי נושא</h2><span class="muted" style="font-size:13px">הקשה על נושא = בחירת תרגול</span></div>
     <div class="topics">${topicRows()}</div>
     <div class="legend"><span><i style="background:var(--good)"></i>ענית נכון בפעם האחרונה</span><span><i style="background:var(--accent);opacity:.35"></i>טעית בפעם האחרונה</span></div>
   </section>
@@ -334,8 +338,25 @@ function vocabCard(){
     <span class="tag">מתחילים כאן</span>
     <h2 style="font-size:20px;margin-top:8px">מילון מונחים בסיסי</h2>
     <p class="muted" style="margin:4px 0 12px">שמות העצמות, השורשים (Osteo-, Myo-, Supra-…) ומונחי הכיוון – בעברית ובאנגלית. רוב השאלות במאגר נשענות עליהם, לכן התרגול החדש מגיש אותם ראשונים. ${v.seen}/${v.n} נענו.</p>
-    <button class="btn primary" type="button" data-act="topic" data-t="vocab">תרגול מונחים</button>
+    <div class="row2"><button class="btn primary" type="button" data-act="topic" data-t="vocab">תרגול מונחים <small>· 10</small></button><button class="btn" type="button" data-act="full" data-t="vocab">כל ${v.n} המונחים</button></div>
   </section>`;
+}
+/* ---------- topic: choose round type ---------- */
+let pickT=null;
+function tpickView(){
+  const s=topicStats(pickT), m=Math.round(s.mastery*100);
+  return `<div class="stack">
+  <div class="sect"><h1 style="font-size:24px">${esc(TOPICS[pickT])}</h1><button class="linkbtn" type="button" data-act="home">חזרה</button></div>
+  <section class="card">
+    <p class="muted" style="margin:0 0 4px">${s.n} שאלות בנושא · ${s.seen} נענו · שליטה ${m}%</p>
+    <span class="bar" style="display:flex;margin:6px 0 14px"><i class="m" style="width:${s.know/s.n*100}%"></i><i class="s" style="width:${(s.seen-s.know)/s.n*100}%"></i></span>
+    <div class="stack" style="margin-top:0">
+      <button class="btn primary" type="button" data-act="topic" data-t="${pickT}">תרגול קצר <small>· ${Math.min(SESSION_LEN,s.n)} שאלות</small></button>
+      <button class="btn" type="button" data-act="full" data-t="${pickT}">כל השאלות בנושא <small>· ${s.n} שאלות</small></button>
+    </div>
+  </section>
+  <p class="note">תרגול קצר מתחיל מהשאלות שעוד לא ראית. בסבב המלא כל שאלה בנושא מופיעה פעם אחת, בסדר אקראי. כל תשובה נשמרת מיד, כך שגם יציאה באמצע לא מוחקת את מה שענית.</p>
+  </div>`;
 }
 /* ---------- question bank (QA view) ---------- */
 let bankTopic="all", bankQ="", bankAns=true;
@@ -373,7 +394,8 @@ function paintBank(){
 }
 function quizView(){
   const it=sess.qs[sess.i], q=QMAP[it.id], done=it.chosen!==null;
-  const dots=sess.qs.map((x,i)=>`<i class="${x.ok===true?"ok":x.ok===false?"no":i===sess.i?"cur":""}"></i>`).join("");
+  const nOk=sess.qs.filter(x=>x.ok===true).length, nNo=sess.qs.filter(x=>x.ok===false).length, N=sess.qs.length;
+  const dots=N>20?`<div class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="${N}" aria-valuenow="${nOk+nNo}"><i class="ok" style="width:${nOk/N*100}%"></i><i class="no" style="width:${nNo/N*100}%"></i></div>`:sess.qs.map((x,i)=>`<i class="${x.ok===true?"ok":x.ok===false?"no":i===sess.i?"cur":""}"></i>`).join("");
   const opts=it.order.map((oi,k)=>{
     let cls=""; if(done){ if(oi===0) cls="right"; else if(k===it.chosen) cls="wrong"; else cls="dim"; }
     return `<button class="opt ${cls}" type="button" data-act="ans" data-k="${k}" ${done?"disabled":""}><span class="l">${LETTERS[k]}</span><span class="t">${esc(q.o[oi])}</span></button>`}).join("");
@@ -389,7 +411,7 @@ function quizView(){
     </section>
     <button class="btn primary" type="button" data-act="next">${sess.i<sess.qs.length-1?"לשאלה הבאה":"לסיכום התרגול"}</button>`;
   }
-  return `<div class="qhead"><span class="count">${sess.i+1}/${sess.qs.length}</span><div class="dots">${dots}</div><button class="xbtn" type="button" data-act="quit">יציאה</button></div>
+  return `<div class="qhead"><span class="count">${sess.i+1}/${sess.qs.length}</span>${N>20?dots:`<div class="dots">${dots}</div>`}<button class="xbtn" type="button" data-act="quit">יציאה</button></div>
   <div class="stack">
     <section class="card">
       <span class="tag">${esc(TOPICS[q.t])}</span>${sess.run>=3?` <span class="tag" style="color:var(--gold);background:var(--gold-soft)">רצף ${sess.run}</span>`:""}
@@ -402,7 +424,7 @@ function quizView(){
 }
 function resultView(){
   const c=sess.qs.filter(x=>x.ok).length, n=sess.qs.length;
-  const msg=c===n?"מושלם! אף טעות.":c>=8?"עבודה מצוינת.":c>=5?"כיוון טוב – כדאי לחזור על הטעויות.":"שווה לעבור שוב על השקופיות ולנסות שוב.";
+  const msg=c===n?"מושלם! אף טעות.":c>=0.8*n?"עבודה מצוינת.":c>=0.5*n?"כיוון טוב – כדאי לחזור על הטעויות.":"שווה לעבור שוב על השקופיות ולנסות שוב.";
   const nb=(sess.newBadges||[]).map(id=>BADGES.find(b=>b.id===id));
   const rows=sess.qs.map(x=>{const q=QMAP[x.id];return `<div class="rv"><span class="mk ${x.ok?"ok":"no"}">${x.ok?"✓":"✗"}</span><span>${esc(q.q)}${x.ok?"":`<br><span class="muted">תשובה: ${esc(q.o[0])} · שקופית ${q.s}</span>`}</span></div>`}).join("");
   return `<div class="stack">
@@ -414,7 +436,7 @@ function resultView(){
   </section>
   ${nb.length?`<section class="card"><h2 style="font-size:19px">תגים חדשים</h2><div class="badges">${nb.map(b=>badgeHTML(b,true)).join("")}</div></section>`:""}
   <div class="stack" style="margin-top:0">
-    <button class="btn primary" type="button" data-act="new">תרגול נוסף</button>
+    ${sess.mode==="full"?`<button class="btn primary" type="button" data-act="full" data-t="${sess.topic}">סבב מלא נוסף בנושא <small>· ${n} שאלות</small></button><button class="btn" type="button" data-act="new">תרגול חדש <small>· 10 שאלות</small></button>`:`<button class="btn primary" type="button" data-act="new">תרגול נוסף</button>`}
     <div class="row2"><button class="btn" type="button" data-act="mistakes" ${mistakes().length?"":"disabled"}>תרגול טעויות (${mistakes().length})</button><button class="btn" type="button" data-act="home">לדף הבית</button></div>
   </div>
   <section class="card"><h2 style="font-size:19px">סקירת התרגול</h2><div class="review">${rows}</div></section>
@@ -465,6 +487,8 @@ document.addEventListener("click",e=>{
   if(a==="new") start("new");
   else if(a==="mistakes") start("mistakes");
   else if(a==="topic") start("topic",b.dataset.t);
+  else if(a==="full") start("full",b.dataset.t);
+  else if(a==="tpick"){pickT=b.dataset.t;view="tpick";render();window.scrollTo(0,0)}
   else if(a==="dash"){view="dash";render();window.scrollTo(0,0)}
   else if(a==="bank"){view="bank";render();window.scrollTo(0,0)}
   else if(a==="bt"){bankTopic=b.dataset.t;document.querySelectorAll(".fchip").forEach(x=>x.classList.toggle("on",x===b));paintBank();}
