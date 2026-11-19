@@ -143,6 +143,28 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.25;margin:0;
 .bo li{padding:2px 6px;border-radius:6px}
 .bo li.right{background:var(--good-soft);color:var(--good);font-weight:700}
 .be{font-size:14px;color:var(--muted);margin:8px 0 10px}
+.mvtools{padding:14px}
+.mvjt{margin:0;font-size:14px}
+.mvsrc{padding:12px}
+.mvpg{margin-top:10px}
+.mvpg img{display:block;width:100%;border-radius:8px;border:1px solid var(--line)}
+.mv{padding:16px}
+.mvh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:2px}
+.mvh h3{font-size:20px}
+.mvh .en{font-weight:700;color:var(--accent);font-size:15px}
+.mvg{margin:2px 0 10px;font-size:14px;color:var(--muted)}
+.mvrow{display:grid;grid-template-columns:82px 1fr;gap:8px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+.mvl{font-size:13px;font-weight:700;color:var(--muted);padding-top:5px}
+.mvl.ag{color:var(--accent)}
+.mvc{display:flex;flex-wrap:wrap;gap:6px}
+.mchip{display:inline-block;padding:4px 10px;border-radius:8px;font-size:15px;font-weight:600;background:var(--bg);border:1px solid var(--line)}
+.mchip.ag{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:700}
+.mchip.hit{outline:2px solid var(--gold);outline-offset:1px}
+.mvnote{margin-top:8px;background:var(--gold-soft);border-radius:10px;padding:10px 12px;font-size:14px}
+.mvnote b{display:block;color:var(--gold);font-size:13px}
+.mvnote p{margin:2px 0 0}
+.mvreveal{width:100%;border:2px dashed var(--line);background:none;border-radius:12px;padding:14px;font-weight:700;color:var(--accent)}
+.mvreveal small{display:block;font-weight:400;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
@@ -295,6 +317,7 @@ function render(){
   else if(view==="dash") el.innerHTML=dashView();
   else if(view==="tpick") el.innerHTML=tpickView();
   else if(view==="bank"){ el.innerHTML=bankView(); paintBank(); }
+  else if(view==="moves"){ el.innerHTML=mvView(); paintMv(); }
 }
 function topicRows(){
   return TOPIC_ORDER.map(t=>{const s=topicStats(t);const m=Math.round(s.mastery*100);
@@ -315,7 +338,10 @@ function homeView(){
         <button class="btn" type="button" data-act="mistakes" ${mis?"":"disabled"}>תרגול טעויות <small>(${mis})</small></button>
         <button class="btn" type="button" data-act="dash">הלוח שלי</button>
       </div>
-      <button class="btn" type="button" data-act="bank">כל השאלות במאגר <small>· ${QUESTIONS.length}</small></button>
+      <div class="row2">
+        <button class="btn" type="button" data-act="moves">טבלת התנועות</button>
+        <button class="btn" type="button" data-act="bank">מאגר השאלות</button>
+      </div>
     </div>
   </section>
   ${vocabCard()}
@@ -480,6 +506,102 @@ function dashView(){
   </div>`;
 }
 
+/* ---------- movement table (טבלת התנועות) ---------- */
+/* each row: he/en movement, g = muscle group [he,en], a = agonist(s), sy = synergist(s), mix = merged agonist+synergist cell, n = note */
+const MOVES = [
+ {k:"gh",pg:"tm1",he:"מפרק הכתף",en:"Glenohumeral Joint",rows:[
+  {he:"כפיפה",en:"Flexion",g:["כופפי הכתף","Shoulder Flexors"],a:["Anterior Deltoid"],sy:["Pectoralis Major – upper","Coracobrachialis","Biceps","Middle Deltoid *"],n:"מעורבות ה-Biceps נתונה במחלוקת – איזה ראש דומיננטי.\n* Middle Deltoid מסייע כשהכפיפה בכתף במנח של רוטציה מידיאלית."},
+  {he:"פשיטה",en:"Extension",g:["פושטי הכתף","Shoulder Extensors"],a:["Latissimus Dorsi"],sy:["Teres Major","Posterior Deltoid","Triceps – long head","Pectoralis Major – lower"],n:"Triceps – long head ו-Pectoralis Major – lower מסייעים לפשיטה רק כשמנח הכתף נמצא כבר בכפיפה."},
+  {he:"הרחקה",en:"Abduction",g:["מרחיקי הכתף","Shoulder Abductors"],a:["Middle Deltoid","Anterior Deltoid *"],sy:["Anterior Deltoid","Supraspinatus"],n:"* מנח הכתף בעת הרחקת כתף (רוטציה חיצונית או פנימית) ישפיע על האגוניסט (לחיצת כתף / הרחקת כתף)."},
+  {he:"קירוב",en:"Adduction",g:["מקרבי הכתף","Shoulder Adductors"],a:["Latissimus Dorsi"],sy:["Pectoralis Major","Teres Major","Coracobrachialis"]},
+  {he:"קירוב אופקי",en:"Horizontal Adduction",g:["מקרבים אופקיים בכתף","Shoulder Horizontal Adductors"],a:["Pectoralis Major"],sy:["Anterior Deltoid","Coracobrachialis"]},
+  {he:"הרחקה אופקית",en:"Horizontal Abduction",g:["מרחיקים אופקיים בכתף","Shoulder Horizontal Abductors"],a:["Posterior Deltoid"],sy:["Infraspinatus","Teres Minor","Middle Deltoid *"],n:"* Middle Deltoid מסייע כשההרחקה האופקית בכתף במנח של רוטציה לטראלית."},
+  {he:"רוטציה מידיאלית",en:"Internal Rotation",g:["מסובבים פנימה בכתף","Shoulder Internal Rotators"],a:["Subscapularis"],sy:["Latissimus Dorsi","Anterior Deltoid","Pectoralis Major","Teres Major"]},
+  {he:"רוטציה לטראלית",en:"External Rotation",g:["מסובבים החוצה בכתף","Shoulder External Rotators"],a:["Infraspinatus"],sy:["Posterior Deltoid","Teres Minor"]}
+ ]},
+ {k:"elb",pg:"tm1",he:"מפרק המרפק",en:"Elbow Joint",rows:[
+  {he:"כפיפה",en:"Flexion",g:["כופפי המרפק","Elbow Flexors"],a:["Biceps – במנח סופינציה","Brachialis – במנח פרונציה"],sy:["Brachioradialis"],n:"שני השרירים (Biceps + Brachialis) פועלים באופן משמעותי בסופינציה."},
+  {he:"פשיטה",en:"Extension",g:["פושטי המרפק","Elbow Extensors"],a:["Triceps"],sy:[]}
+ ]},
+ {k:"st",pg:"tm2",he:"מפרק שכמה–בית חזה",en:"Scapulothoracic Joint",rows:[
+  {he:"הרחקה",en:"Protraction",g:["מרחיקי השכמה","Scapular Protractors"],a:["Serratus Anterior"],sy:["Pectoralis Minor"]},
+  {he:"קירוב",en:"Retraction",g:["מקרבי השכמה","Scapular Retractors"],a:["Trapezius"],sy:["Rhomboids"]},
+  {he:"הרמה",en:"Elevation",g:["מרימי השכמה","Scapular Elevators"],a:["Trapezius – upper"],sy:["Rhomboids","Levator Scapulae"]},
+  {he:"הורדה",en:"Depression",g:["מורידי השכמה","Scapular Depressors"],a:["Trapezius – lower"],sy:["Pectoralis Minor"]},
+  {he:"רוטציה לטראלית",en:"Upward Rotation",g:["מסובבים החוצה בשכמה","Scapular Lateral Rotators"],mix:["Serratus Anterior","Trapezius – upper + lower"],n:"תנועה בדרך כלל משולבת עם הרחקת שכמה.\nמידת המעורבות של כל אחד מהשרירים תלויה בזווית בה מתבצעת התנועה."},
+  {he:"רוטציה מידיאלית",en:"Downward Rotation",g:["מסובבים פנימה בשכמה","Scapular Medial Rotators"],mix:["Levator Scapulae","Pectoralis Minor","Rhomboids"],n:"תנועה בדרך כלל משולבת עם קירוב שכמה.\nמידת המעורבות של כל אחד מהשרירים תלויה בזווית בה מתבצעת התנועה."}
+ ]},
+ {k:"sp",pg:"tm3",he:"עמוד השדרה",en:"Spine",rows:[
+  {he:"כפיפה",en:"Flexion",g:["כופפי עמוד השדרה","Spine Flexors"],a:["Rectus Abdominis"],sy:["External + Internal Oblique – בשני הצדדים"]},
+  {he:"פשיטה",en:"Extension",g:["פושטי עמוד השדרה","Spine Extensors"],a:["Erector Spinae"],sy:["Quadratus Lumborum – בשני הצדדים"]},
+  {he:"כפיפה + רוטציה לשמאל",en:"Flexion + Rotation (left)",g:["מסובבי עמוד השדרה","Spine Rotators"],a:["External Oblique – ימין","Internal Oblique – שמאל"],sy:["Rectus Abdominis"],n:"תנועה ממרפק ימין לכיוון ברך שמאל."},
+  {he:"כפיפה צידית לימין",en:"Lateral Flexion (right)",g:["כופפים צידית בעמוד השדרה","Spine Side Flexors"],a:["Quadratus Lumborum"],sy:["External + Internal Oblique – של צד ימין","Erector Spinae – של צד ימין"]}
+ ]},
+ {k:"hip",pg:"tm3",he:"מפרק הירך",en:"Hip Joint",rows:[
+  {he:"כפיפה",en:"Flexion",g:["כופפי ירך","Hip Flexors"],a:["Iliopsoas"],sy:["Rectus Femoris"]},
+  {he:"פשיטה",en:"Extension",g:["פושטי ירך","Hip Extensors"],a:["Gluteus Maximus"],sy:["Hamstrings","Adductor Magnus *"],n:"* ה-Adductor Magnus הוא אחד ממקרבי הירך (הגדול מביניהם)."},
+  {he:"הרחקה",en:"Abduction",g:["מרחיקי ירך","Hip Abductors Group"],a:["Gluteus Medius"],sy:["Gluteus Minimus"],n:"להבדיל בין הרחקת ירך (בפולי) להרחקה אופקית (במכונה)."},
+  {he:"קירוב",en:"Adduction",g:["מקרבי ירך","Hip Adductors Group"],a:["Adductor Magnus","Adductor Brevis","Adductor Longus","Gracilis","Pectineus"],sy:[]},
+  {he:"רוטציה מידיאלית",en:"Internal Rotation",g:["מסובבים פנימה","Hip Internal Rotators Group"],a:["Gluteus Minimus"],sy:["Gluteus Medius","Hip Adductors"]},
+  {he:"רוטציה לטראלית",en:"External Rotation",g:["מסובבים החוצה","Hip External Rotators Group"],a:["Piriformis"],sy:["Gluteus Maximus"]}
+ ]},
+ {k:"knee",pg:"tm2",he:"מפרק הברך",en:"Knee Joint",rows:[
+  {he:"פשיטה",en:"Extension",g:["פושטי הברך","Knee Extensors"],a:["Quadriceps"],sy:[]},
+  {he:"כפיפה",en:"Flexion",g:["כופפי הברך","Knee Flexors"],a:["Hamstrings"],sy:["Gastrocnemius"]}
+ ]},
+ {k:"ank",pg:"tm2",he:"מפרק הקרסול",en:"Ankle Joint",rows:[
+  {he:"כפיפה כפית",en:"Plantar Flexion",g:["כופפים כפית","Plantar Flexors"],a:["Gastrocnemius *","Soleus *"],sy:[],n:"* תלוי במנח הברך:\nכפיפה כפית כשהברך ישרה – Gastrocnemius אגוניסט.\nכפיפה כפית כשהברך כפופה – Soleus אגוניסט."},
+  {he:"כפיפה גבית",en:"Dorsiflexion",g:["כופפים גבית","Dorsi Flexors"],a:["Tibialis Anterior"],sy:[]}
+ ]}
+];
+let mvJoint="gh", mvQ="", mvHide=false, mvOpen=new Set();
+function mvView(){
+  const chips=MOVES.map(j=>`<button class="fchip ${mvJoint===j.k&&!mvQ.trim()?"on":""}" type="button" data-act="mvj" data-k="${j.k}">${esc(j.he)}</button>`).join("");
+  return `<div class="stack">
+  <div class="sect"><h1 style="font-size:24px">טבלת התנועות</h1><button class="linkbtn" type="button" data-act="home">חזרה</button></div>
+  <section class="card mvtools">
+    <input id="mvSearch" class="search" type="search" placeholder="חיפוש שריר – למשל Rhomboids" value="${esc(mvQ)}" aria-label="חיפוש שריר" dir="auto">
+    <div class="fchips">${chips}</div>
+    <label class="tog"><input type="checkbox" id="mvHide" ${mvHide?"checked":""}> מצב שינון – הסתרת השרירים עד הקשה</label>
+  </section>
+  <div id="mvList" class="stack" style="margin-top:0"></div>
+  </div>`;
+}
+function mvChips(list,cls,hit){
+  if(!list||!list.length) return `<span class="muted">—</span>`;
+  return list.map(m=>{const on=hit&&m.toLowerCase().includes(hit);return `<span class="mchip ${cls} ${on?"hit":""}" dir="auto"><bdi>${esc(m)}</bdi></span>`}).join("");
+}
+function mvCard(j,r,i,hit,showJoint){
+  const key=j.k+i, hidden=mvHide&&!mvOpen.has(key);
+  const body=hidden?`<button class="mvreveal" type="button" data-act="mvr" data-key="${key}">מי השרירים? <small>הקשה לחשיפה</small></button>`:
+   (r.mix?`<div class="mvrow"><span class="mvl">שרירים מעורבים</span><div class="mvc">${mvChips(r.mix,"ag",hit)}</div></div>`:
+   `<div class="mvrow"><span class="mvl ag">אגוניסט</span><div class="mvc">${mvChips(r.a,"ag",hit)}</div></div>
+    <div class="mvrow"><span class="mvl">סינרגיסט</span><div class="mvc">${mvChips(r.sy,"sy",hit)}</div></div>`)+
+   (r.n?`<div class="mvnote"><b>הערה</b>${r.n.split("\n").map(x=>`<p dir="auto">${esc(x)}</p>`).join("")}</div>`:"");
+  return `<article class="card mv">
+    ${showJoint?`<span class="tag">${esc(j.he)}</span>`:""}
+    <div class="mvh"><h3>${esc(r.he)}</h3><span class="en" dir="ltr">${esc(r.en)}</span></div>
+    <p class="mvg">${esc(r.g[0])} · <span dir="ltr">${esc(r.g[1])}</span></p>
+    ${body}
+  </article>`;
+}
+function paintMv(){
+  const s=mvQ.trim().toLowerCase(), box=$("#mvList");
+  if(s){
+    const out=[];
+    MOVES.forEach(j=>j.rows.forEach((r,i)=>{const all=[...(r.a||[]),...(r.sy||[]),...(r.mix||[])].join(" ").toLowerCase();
+      if(all.includes(s)||(r.he+" "+r.en+" "+r.g.join(" ")).toLowerCase().includes(s)) out.push(mvCard(j,r,i,s,true));}));
+    box.innerHTML=`<p class="muted" style="margin:0;font-size:14px">${out.length} תנועות</p>`+(out.join("")||`<p class="muted">לא נמצאו תנועות.</p>`);
+  } else {
+    const j=MOVES.find(x=>x.k===mvJoint);
+    box.innerHTML=`<p class="muted mvjt"><bdi>${esc(j.en)}</bdi> · ${j.rows.length} תנועות</p>`+
+      `<section class="card mvsrc"><button class="linkbtn" type="button" data-act="mvpg">הצגת הדף המקורי מהחוברת</button>
+       <div class="mvpg" hidden><a href="img/${j.pg}.jpg" target="_blank" rel="noopener"><img src="img/${j.pg}.jpg" alt="צילום דף טבלת התנועות מהחוברת" loading="lazy"></a>
+       <p class="muted" style="margin:6px 0 0;font-size:13px">הקשה על התמונה פותחת אותה בגודל מלא (להגדלה או לשמירה).</p></div></section>`+j.rows.map((r,i)=>mvCard(j,r,i,"",false)).join("");
+  }
+  document.querySelectorAll("[data-act=mvj]").forEach(x=>x.classList.toggle("on",!s&&x.dataset.k===mvJoint));
+}
+
 /* ---------- events ---------- */
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b||b.disabled) return;
@@ -493,6 +615,10 @@ document.addEventListener("click",e=>{
   else if(a==="bank"){view="bank";render();window.scrollTo(0,0)}
   else if(a==="bt"){bankTopic=b.dataset.t;document.querySelectorAll(".fchip").forEach(x=>x.classList.toggle("on",x===b));paintBank();}
   else if(a==="bslide"){const box=b.nextElementSibling; if(!box.firstChild) box.innerHTML=`<img src="s/${b.dataset.s}.jpg" alt="שקופית ${b.dataset.s} מהמצגת" loading="lazy">`; box.hidden=!box.hidden; b.textContent=(box.hidden?"הצגת":"הסתרת")+" שקופית "+b.dataset.s;}
+  else if(a==="moves"){view="moves";render();window.scrollTo(0,0)}
+  else if(a==="mvj"){mvJoint=b.dataset.k;if(mvQ){mvQ="";$("#mvSearch").value="";}paintMv();}
+  else if(a==="mvpg"){const box=b.nextElementSibling;box.hidden=!box.hidden;b.textContent=box.hidden?"הצגת הדף המקורי מהחוברת":"הסתרת הדף המקורי";}
+  else if(a==="mvr"){mvOpen.add(b.dataset.key);paintMv();}
   else if(a==="home"){view="home";render();window.scrollTo(0,0)}
   else if(a==="ans") answer(+b.dataset.k);
   else if(a==="next") next();
@@ -502,6 +628,8 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
   if(e.target.id==="bankSearch"){bankQ=e.target.value;paintBank();}
   else if(e.target.id==="bankAns"){bankAns=e.target.checked;paintBank();}
+  else if(e.target.id==="mvSearch"){mvQ=e.target.value;paintMv();}
+  else if(e.target.id==="mvHide"){mvHide=e.target.checked;mvOpen.clear();paintMv();}
 });
 $("#homeBtn").addEventListener("click",()=>{view="home";sess=null;render();});
 document.addEventListener("keydown",e=>{
